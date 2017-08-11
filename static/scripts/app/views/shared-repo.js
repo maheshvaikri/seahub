@@ -58,11 +58,6 @@ define([
                 dataType: 'json',
                 success: success_callback
             });
-            if (this.model.get('is_admin') == true){
-                $.ajax({
-
-                })
-            } 
 
             return false;
         },

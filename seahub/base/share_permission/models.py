@@ -4,22 +4,16 @@ from django.db import models
 
 
 class SharePermissionManager(models.Manager):
-    def is_admin_users(self, repo_id, username):
-        admin_list = super(SharePermissionManager, self).filter(
-            repo_id=repo_id, permission='admin', share_to=username
+    def get_user_permission(self, repo_id, username):
+        record_list = super(SharePermissionManager, self).filter(
+            repo_id=repo_id, share_to=username
         )
-        if len(admin_list) > 0:
-            return True
+        if len(record_list) > 0:
+            return record_list[0].permission
         else:
-            return False
+            return None
 
-    def get_admin_users(self, repo_id):
-        admin_list = super(SharePermissionManager, self).filter(
-            repo_id=repo_id, permission='admin'
-        )
-        return [e.share_to for e in can_share_list]
-
-    def can_delete_or_update_share_records(self, repo_id, share_from, share_to):
+    def can_delete_or_update_shared_records(self, repo_id, share_from, share_to):
         share_records = super(SharePermissionManager, self).filter(
             repo_id=repo_id, share_from=share_from, share_to=share_to
         )
@@ -28,7 +22,7 @@ class SharePermissionManager(models.Manager):
         else:
             return False
 
-    def get_shared_repos_share_from_by_shared(self, username):
+    def get_shared_repos_share_from_by_shared_with_admin(self, username):
         shared_repos = super(SharePermissionManager, self).filter(
             share_to=username, permission='admin'
         )
@@ -37,18 +31,27 @@ class SharePermissionManager(models.Manager):
             res_shared_repos[e.repo_id] = e.share_from
         return res_shared_repos
 
-    def get_admin_users_by_owner(self, repo_id, username):
+    def get_shared_repos_share_from_by_shared_with_preview(self, username):
         shared_repos = super(SharePermissionManager, self).filter(
-            repo_id=repo_id, share_from=username, permission='admin'
+            share_to=username, permission='preview'
         )
-        shared_repos = [e.share_to for e in shared_repos]
+        res_shared_repos = {}
+        for e in shared_repos:
+            res_shared_repos[e.repo_id] = e.share_from
+        return res_shared_repos
+
+    def get_permission_by_owner_shared(self, repo_id, username):
+        shared_repos = super(SharePermissionManager, self).filter(
+            repo_id=repo_id, share_from=username
+        )
+        shared_repos = [(e.share_to, e.permission) for e in shared_repos]
         return shared_repos
 
     def create_share_permission(self, repo_id, share_from, username, permission):
         self.model(repo_id=repo_id, share_from=share_from, share_to=username, 
                    permission=permission).save()
 
-    def delete_shared_admin_repos(self, repo_id, share_from, share_to):
+    def delete_user_shared_repo(self, repo_id, share_from, share_to):
         super(SharePermissionManager, self).filter(repo_id=repo_id, 
                                                    share_from=share_from, 
                                                    share_to=share_to).delete()

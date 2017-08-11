@@ -18,6 +18,7 @@ define([
             owner_nickname: "-",
             permission: "rw",
             is_admin: false,
+            is_preview: false,
             share_from: "",
         },
 

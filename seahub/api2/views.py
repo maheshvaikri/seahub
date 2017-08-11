@@ -488,8 +488,8 @@ class Repos(APIView):
                     nickname_dict[e] = email2nickname(e)
 
             shared_repos.sort(lambda x, y: cmp(y.last_modify, x.last_modify))
-            shared_repos_share_from = SharePermission.objects. \
-                    get_shared_repos_share_from_by_shared(email)
+            shared_repos_share_from_with_admin = SharePermission.objects. \
+                    get_shared_repos_share_from_by_shared_with_admin(email)
             for r in shared_repos:
                 r.password_need = is_passwd_set(r.repo_id, email)
                 repo = {
@@ -512,11 +512,14 @@ class Repos(APIView):
                     "head_commit_id": r.head_cmmt_id,
                     "version": r.version,
                 }
-                if r.repo_id in shared_repos_share_from.keys():
+                
+
+                if r.repo_id in shared_repos_share_from_with_admin.keys():
                     repo['is_admin'] = True
-                    repo['share_from'] = shared_repos_share_from[r.repo_id]
+                    repo['share_from'] = shared_repos_share_from_with_admin[r.repo_id]
                 else:
                     repo['is_admin'] = False
+
                 repos_json.append(repo)
 
         if filter_by['group']:

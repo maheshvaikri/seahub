@@ -518,6 +518,7 @@ define([
                     user_perm: dir.user_perm,
                     no_quota: dir.no_quota,
                     encrypted: dir.encrypted,
+                    is_preview: dir.is_preview,
                     mode: this.view_mode,
                     path: dir.path,
                     repo_id: dir.repo_id,
@@ -525,7 +526,8 @@ define([
                     is_repo_owner: dir.is_repo_owner,
                     can_generate_share_link: app.pageOptions.can_generate_share_link,
                     can_generate_upload_link: app.pageOptions.can_generate_upload_link,
-                    enable_upload_folder: app.pageOptions.enable_upload_folder
+                    enable_upload_folder: app.pageOptions.enable_upload_folder,
+                    only_preview: app.pageOptions.only_preview
                 })))
                 .removeAttr('style'); // there may be a 'style' added via 'onWindowScroll()' when visiting last dir
 

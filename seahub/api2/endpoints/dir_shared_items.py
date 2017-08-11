@@ -56,7 +56,9 @@ class DirSharedItemsEndpoint(APIView):
                 share_items = seafile_api.get_shared_users_for_subdir(repo_id,
                                                                       path, username)
         ret = []
-        admin_user_list = SharePermission.objects.get_admin_users_by_owner(repo_id, username)
+        permission_list = SharePermission.objects.get_permission_by_owner_shared(repo_id, username)
+        print permission_list
+        permission_dict = dict(permission_list)
         for item in share_items:
             data = {
                 "share_type": "user",
@@ -65,10 +67,7 @@ class DirSharedItemsEndpoint(APIView):
                     "nickname": email2nickname(item.user),
                 }
             }
-            if item.user in admin_user_list:
-                data['permission'] = 'admin'
-            else:
-                data['permission'] = item.perm,
+            data['permission'] = permission_dict[item.user]
             ret.append(data)
         return ret
 
@@ -183,7 +182,7 @@ class DirSharedItemsEndpoint(APIView):
             return api_error(status.HTTP_404_NOT_FOUND, 'Folder %s not found.' % path)
 
         permission = request.data.get('permission', 'r')
-        if permission not in ['r', 'rw', 'admin']:
+        if permission not in ['r', 'rw', 'admin', 'preview']:
             return api_error(status.HTTP_400_BAD_REQUEST, 'permission invalid.')
 
         shared_to_user, shared_to_group = self.handle_shared_to_args(request)
@@ -193,7 +192,7 @@ class DirSharedItemsEndpoint(APIView):
                 return api_error(status.HTTP_400_BAD_REQUEST, 'Email %s invalid.' % shared_to)
 
             if username != self.get_repo_owner(request, repo_id) and \
-               not SharePermission.objects.can_delete_or_update_share_records(repo_id, username, shared_to):
+               not SharePermission.objects.can_delete_or_update_shared_records(repo_id, username, shared_to):
                 return api_error(status.HTTP_403_FORBIDDEN, 'Permission denied.')
         else:
             if username != self.get_repo_owner(request, repo_id):
@@ -210,10 +209,10 @@ class DirSharedItemsEndpoint(APIView):
                                                                 username, 
                                                                 shared_to, 
                                                                 permission)
-            is_admin = False
             if permission == 'admin':
                 permission = 'rw'
-                is_admin = True
+            if permission == 'preview':
+                permission = 'r'
 
             if is_org_context(request):
                 org_id = request.user.org.org_id
@@ -276,7 +275,7 @@ class DirSharedItemsEndpoint(APIView):
             return api_error(status.HTTP_404_NOT_FOUND, 'Folder %s not found.' % path)
 
         if username != self.get_repo_owner(request, repo_id) and \
-           not SharePermission.objects.is_admin_users(repo_id, username):
+           SharePermission.objects.get_user_permission(repo_id, username) != 'admin':
             return api_error(status.HTTP_403_FORBIDDEN, 'Permission denied.')
 
         share_type = request.data.get('share_type')
@@ -284,7 +283,7 @@ class DirSharedItemsEndpoint(APIView):
             return api_error(status.HTTP_400_BAD_REQUEST, 'share_type invalid.')
 
         permission = request.data.get('permission', 'r')
-        if permission not in ['r', 'rw', 'admin']:
+        if permission not in ['r', 'rw', 'admin', 'preview']:
             return api_error(status.HTTP_400_BAD_REQUEST, 'permission invalid.')
 
         result = {}
@@ -318,12 +317,12 @@ class DirSharedItemsEndpoint(APIView):
                     continue
 
                 try:
-                    is_admin = False
+                    is_seahub_permission = False
                     if path == '/':
                         SharePermission.objects.create_share_permission(repo_id, username, to_user, permission)
-                    if permission == 'admin':
-                        is_admin = True
-                        permission = 'rw'
+                    if permission not in ['r', 'rw']:
+                        is_seahub_permission = permission
+                        permission = 'rw' if permission == 'admin' else 'r'
 
                     if is_org_context(request):
                         org_id = request.user.org.org_id
@@ -351,8 +350,8 @@ class DirSharedItemsEndpoint(APIView):
                         share_repo_to_user_successful.send(sender=None,
                                 from_user=username, to_user=to_user, repo=sub_repo)
 
-                    if is_admin:
-                        permission = 'admin'
+                    if is_seahub_permission:
+                        permission = is_seahub_permission
                     result['success'].append({
                         "share_type": "user",
                         "user_info": {
@@ -448,6 +447,7 @@ class DirSharedItemsEndpoint(APIView):
         if seafile_api.get_dir_id_by_path(repo.id, path) is None:
             return api_error(status.HTTP_404_NOT_FOUND, 'Folder %s not found.' % path)
 
+        # check permission
         shared_to_user, shared_to_group = self.handle_shared_to_args(request)
         if shared_to_user:
             shared_to = request.GET.get('username')
@@ -467,10 +467,11 @@ class DirSharedItemsEndpoint(APIView):
             permission = seafile_api.check_permission_by_path(
                     repo_id, '/', shared_to)
 
+            # delete seahub permission record if is library
             if path == '/':
-                SharePermission.objects.delete_shared_admin_repos(repo_id, 
-                                                                  username, 
-                                                                  shared_to)
+                SharePermission.objects.delete_user_shared_repo(repo_id, 
+                                                                username, 
+                                                                shared_to)
             if is_org_context(request):
                 org_id = request.user.org.org_id
                 if path == '/':
